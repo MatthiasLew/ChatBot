@@ -1,0 +1,10 @@
+Użytkownik: 2+2=?
+Bot: 2
+Użytkownik: capital of france?
+Bot: The capital of France is Paris. This city serves as the seat of government and holds significant historical and cultural importance, including hosting major landmarks like the Eiffel Tower and prominent institutions such as the Elysee Palace where the President resides. Additionally, Paris has been pivotal in various historical events, including the French Revolution and Napoleon's reign.
+Użytkownik: write poemat in 5 word
+Bot: Sure! Here's a poem made of five words:
+
+Sneaking glimpse in starry sky  
+Distant star, a fleeting gleam  
+Shadowed hand upon the pane
