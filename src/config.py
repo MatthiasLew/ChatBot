@@ -1,5 +1,3 @@
-# config.py
-
 # Base URL of the local or remote API endpoint for chat completions.
 # Adjust this value if the backend server address or port changes.
 API_URL = "http://127.0.0.1:1234/v1/chat/completions"

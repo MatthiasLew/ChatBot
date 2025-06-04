@@ -1,5 +1,3 @@
-# translations.py
-
 # Dictionary holding UI string translations for supported interface languages.
 # Each top-level key is a language code (e.g., "pl" for Polish, "en" for English).
 # Values are nested dictionaries mapping internal UI keys to localized display strings.

@@ -1,5 +1,3 @@
-# chat_modes.py
-
 # Dictionary defining available chat modes per supported language.
 # Each mode corresponds to a different conversational style or assistant behavior.
 # These prompts are sent as "system" messages to guide the model's tone and purpose.

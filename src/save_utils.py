@@ -1,5 +1,3 @@
-# save_utils.py
-
 from docx import Document
 
 
