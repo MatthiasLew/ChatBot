@@ -1,0 +1,6 @@
+Użytkownik: ile to 2+2?
+Bot: 2
+Użytkownik: ile to 2+2=x?
+Bot: 2
+Użytkownik: 2+2=?
+Bot: 2
