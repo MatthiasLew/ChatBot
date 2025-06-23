@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>main &#8212; ChatBot 23.06.2025 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=686e5160" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <script src="../_static/documentation_options.js?v=c02eaca7"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for main</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">chat_gui_app.py</span>
+
+<span class="sd">Main graphical user interface (GUI) for the chatbot application.</span>
+<span class="sd">Integrates user interaction, language switching, message processing,</span>
+<span class="sd">and AI integration through an API. Uses Tkinter for GUI components.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">tkinter</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">tk</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">tkinter</span><span class="w"> </span><span class="kn">import</span> <span class="n">ttk</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">config</span><span class="w"> </span><span class="kn">import</span> <span class="n">API_URL</span><span class="p">,</span> <span class="n">AVAILABLE_MODELS</span><span class="p">,</span> <span class="n">DEFAULT_MODEL</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">chat_modes</span><span class="w"> </span><span class="kn">import</span> <span class="n">CHAT_MODES</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">save_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">save_txt</span><span class="p">,</span> <span class="n">save_docx</span><span class="p">,</span> <span class="n">TxtSaver</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">translations</span><span class="w"> </span><span class="kn">import</span> <span class="n">translations</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">chat_manager</span><span class="w"> </span><span class="kn">import</span> <span class="n">ChatManager</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">plot_lengths</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">functional_utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">uppercase_conversation</span><span class="p">,</span> <span class="n">only_user_messages</span><span class="p">,</span> <span class="n">total_chars</span><span class="p">,</span>
+    <span class="n">get_unique_speakers</span><span class="p">,</span> <span class="n">search_messages</span>
+<span class="p">)</span>
+
+<span class="c1"># Global state</span>
+<span class="n">current_language</span> <span class="o">=</span> <span class="s2">&quot;pl&quot;</span>
+<span class="n">chat_manager</span> <span class="o">=</span> <span class="n">ChatManager</span><span class="p">()</span>
+
+
+<div class="viewcode-block" id="get_translation">
+<a class="viewcode-back" href="../index.html#main.get_translation">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_translation</span><span class="p">(</span><span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Fetch localized UI string based on the current language.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">translations</span><span class="p">[</span><span class="n">current_language</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="countdown">
+<a class="viewcode-back" href="../index.html#main.countdown">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">countdown</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Recursive countdown generator for /countdown command.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">n</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[</span><span class="s2">&quot;Start!&quot;</span><span class="p">]</span>
+    <span class="k">return</span> <span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">n</span><span class="p">)]</span> <span class="o">+</span> <span class="n">countdown</span><span class="p">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="log_call">
+<a class="viewcode-back" href="../index.html#main.log_call">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">log_call</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Decorator that logs function calls for debugging.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">wrapper</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;🛠️ Wywołanie funkcji: </span><span class="si">{</span><span class="n">func</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">wrapper</span></div>
+
+
+
+<div class="viewcode-block" id="save_as_txt">
+<a class="viewcode-back" href="../index.html#main.save_as_txt">[docs]</a>
+<span class="nd">@log_call</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">save_as_txt</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Save current conversation to a TXT file.&quot;&quot;&quot;</span>
+    <span class="n">save_txt</span><span class="p">(</span><span class="n">chat_manager</span><span class="o">.</span><span class="n">get</span><span class="p">())</span></div>
+
+
+
+<div class="viewcode-block" id="save_as_docx">
+<a class="viewcode-back" href="../index.html#main.save_as_docx">[docs]</a>
+<span class="nd">@log_call</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">save_as_docx</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Save current conversation to a DOCX file.&quot;&quot;&quot;</span>
+    <span class="n">save_docx</span><span class="p">(</span><span class="n">chat_manager</span><span class="o">.</span><span class="n">get</span><span class="p">())</span></div>
+
+
+
+<div class="viewcode-block" id="send_message">
+<a class="viewcode-back" href="../index.html#main.send_message">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">send_message</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Handle message submission, including custom commands and API call.&quot;&quot;&quot;</span>
+    <span class="n">user_input</span> <span class="o">=</span> <span class="n">input_box</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;1.0&quot;</span><span class="p">,</span> <span class="n">tk</span><span class="o">.</span><span class="n">END</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">user_input</span><span class="p">:</span>
+        <span class="k">return</span>
+
+    <span class="k">if</span> <span class="n">user_input</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;/countdown&quot;</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">n</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">user_input</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">1</span><span class="p">])</span>
+            <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">countdown</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+                <span class="n">chat_manager</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s2">&quot;Bot&quot;</span><span class="p">,</span> <span class="n">line</span><span class="p">)</span>
+            <span class="n">display_chat</span><span class="p">()</span>
+            <span class="k">return</span>
+        <span class="k">except</span><span class="p">:</span>
+            <span class="n">chat_manager</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s2">&quot;Bot&quot;</span><span class="p">,</span> <span class="s2">&quot;Użyj: /countdown liczba&quot;</span><span class="p">)</span>
+            <span class="n">display_chat</span><span class="p">()</span>
+            <span class="k">return</span>
+
+    <span class="k">if</span> <span class="n">user_input</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;/repeat&quot;</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">n</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">user_input</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">1</span><span class="p">])</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+                <span class="n">chat_manager</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s2">&quot;Bot&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;To jest powtórzenie </span><span class="si">{</span><span class="n">i</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">display_chat</span><span class="p">()</span>
+            <span class="k">return</span>
+        <span class="k">except</span><span class="p">:</span>
+            <span class="n">chat_manager</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s2">&quot;Bot&quot;</span><span class="p">,</span> <span class="s2">&quot;Użyj: /repeat liczba&quot;</span><span class="p">)</span>
+            <span class="n">display_chat</span><span class="p">()</span>
+            <span class="k">return</span>
+
+    <span class="n">chat_manager</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s2">&quot;Użytkownik&quot;</span><span class="p">,</span> <span class="n">user_input</span><span class="p">)</span>
+    <span class="n">display_chat</span><span class="p">()</span>
+
+    <span class="n">headers</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;Content-Type&quot;</span><span class="p">:</span> <span class="s2">&quot;application/json&quot;</span><span class="p">}</span>
+    <span class="n">mode_prompt</span> <span class="o">=</span> <span class="n">CHAT_MODES</span><span class="p">[</span><span class="n">current_language</span><span class="p">][</span><span class="n">mode_var</span><span class="o">.</span><span class="n">get</span><span class="p">()]</span>
+    <span class="n">payload</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;model&quot;</span><span class="p">:</span> <span class="n">model_var</span><span class="o">.</span><span class="n">get</span><span class="p">(),</span>
+        <span class="s2">&quot;messages&quot;</span><span class="p">:</span> <span class="p">[</span>
+            <span class="p">{</span><span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="s2">&quot;system&quot;</span><span class="p">,</span> <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="n">mode_prompt</span><span class="p">},</span>
+            <span class="p">{</span><span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="s2">&quot;user&quot;</span><span class="p">,</span> <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="n">user_input</span><span class="p">}</span>
+        <span class="p">],</span>
+        <span class="s2">&quot;temperature&quot;</span><span class="p">:</span> <span class="mf">0.7</span>
+    <span class="p">}</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="n">API_URL</span><span class="p">,</span> <span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">,</span> <span class="n">json</span><span class="o">=</span><span class="n">payload</span><span class="p">)</span>
+        <span class="n">response</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>
+        <span class="n">bot_reply</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()[</span><span class="s2">&quot;choices&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;message&quot;</span><span class="p">][</span><span class="s2">&quot;content&quot;</span><span class="p">]</span>
+        <span class="n">bot_reply</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;&lt;think&gt;.*?&lt;/think&gt;&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">bot_reply</span><span class="p">,</span> <span class="n">flags</span><span class="o">=</span><span class="n">re</span><span class="o">.</span><span class="n">DOTALL</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="n">bot_reply</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;</span><span class="se">\\\\</span><span class="s2">\[.*?</span><span class="se">\\\\</span><span class="s2">&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">bot_reply</span><span class="p">,</span> <span class="n">flags</span><span class="o">=</span><span class="n">re</span><span class="o">.</span><span class="n">DOTALL</span><span class="p">)</span>
+        <span class="n">bot_reply</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">boxed\{(.*?)}&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1&quot;</span><span class="p">,</span> <span class="n">bot_reply</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="n">match</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;[-+]?\d*\.?\d+&quot;</span><span class="p">,</span> <span class="n">bot_reply</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">match</span><span class="p">:</span>
+            <span class="n">bot_reply</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">bot_reply</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Błąd: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span>
+
+    <span class="n">chat_manager</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s2">&quot;Bot&quot;</span><span class="p">,</span> <span class="n">bot_reply</span><span class="p">)</span>
+    <span class="n">display_chat</span><span class="p">()</span>
+    <span class="n">input_box</span><span class="o">.</span><span class="n">delete</span><span class="p">(</span><span class="s2">&quot;1.0&quot;</span><span class="p">,</span> <span class="n">tk</span><span class="o">.</span><span class="n">END</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="display_chat">
+<a class="viewcode-back" href="../index.html#main.display_chat">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">display_chat</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Update the chat display with the current conversation.&quot;&quot;&quot;</span>
+    <span class="n">chat_display</span><span class="o">.</span><span class="n">config</span><span class="p">(</span><span class="n">state</span><span class="o">=</span><span class="s2">&quot;normal&quot;</span><span class="p">)</span>
+    <span class="n">chat_display</span><span class="o">.</span><span class="n">delete</span><span class="p">(</span><span class="s2">&quot;1.0&quot;</span><span class="p">,</span> <span class="n">tk</span><span class="o">.</span><span class="n">END</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">speaker</span><span class="p">,</span> <span class="n">text</span> <span class="ow">in</span> <span class="n">chat_manager</span><span class="o">.</span><span class="n">get</span><span class="p">():</span>
+        <span class="n">chat_display</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">tk</span><span class="o">.</span><span class="n">END</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">speaker</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">text</span><span class="si">}</span><span class="se">\n\n</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">chat_display</span><span class="o">.</span><span class="n">config</span><span class="p">(</span><span class="n">state</span><span class="o">=</span><span class="s2">&quot;disabled&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="switch_language">
+<a class="viewcode-back" href="../index.html#main.switch_language">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">switch_language</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Toggle the UI language between Polish and English.&quot;&quot;&quot;</span>
+    <span class="k">global</span> <span class="n">current_language</span>
+    <span class="n">current_language</span> <span class="o">=</span> <span class="s2">&quot;en&quot;</span> <span class="k">if</span> <span class="n">current_language</span> <span class="o">==</span> <span class="s2">&quot;pl&quot;</span> <span class="k">else</span> <span class="s2">&quot;pl&quot;</span>
+    <span class="n">update_labels</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="update_labels">
+<a class="viewcode-back" href="../index.html#main.update_labels">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">update_labels</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Update all UI labels based on the selected language.&quot;&quot;&quot;</span>
+    <span class="n">root</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="n">get_translation</span><span class="p">(</span><span class="s2">&quot;title&quot;</span><span class="p">))</span>
+    <span class="n">send_button</span><span class="o">.</span><span class="n">config</span><span class="p">(</span><span class="n">text</span><span class="o">=</span><span class="n">get_translation</span><span class="p">(</span><span class="s2">&quot;send&quot;</span><span class="p">))</span>
+    <span class="n">save_txt_button</span><span class="o">.</span><span class="n">config</span><span class="p">(</span><span class="n">text</span><span class="o">=</span><span class="n">get_translation</span><span class="p">(</span><span class="s2">&quot;save_txt&quot;</span><span class="p">))</span>
+    <span class="n">save_docx_button</span><span class="o">.</span><span class="n">config</span><span class="p">(</span><span class="n">text</span><span class="o">=</span><span class="n">get_translation</span><span class="p">(</span><span class="s2">&quot;save_docx&quot;</span><span class="p">))</span>
+    <span class="n">mode_label</span><span class="o">.</span><span class="n">config</span><span class="p">(</span><span class="n">text</span><span class="o">=</span><span class="n">get_translation</span><span class="p">(</span><span class="s2">&quot;mode&quot;</span><span class="p">))</span>
+    <span class="n">model_label</span><span class="o">.</span><span class="n">config</span><span class="p">(</span><span class="n">text</span><span class="o">=</span><span class="n">get_translation</span><span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">))</span>
+    <span class="n">lang_button</span><span class="o">.</span><span class="n">config</span><span class="p">(</span><span class="n">text</span><span class="o">=</span><span class="n">get_translation</span><span class="p">(</span><span class="s2">&quot;language&quot;</span><span class="p">))</span>
+
+    <span class="n">available_modes</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">CHAT_MODES</span><span class="p">[</span><span class="n">current_language</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+    <span class="n">mode_menu</span><span class="p">[</span><span class="s2">&quot;values&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">available_modes</span>
+    <span class="n">mode_var</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">available_modes</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span></div>
+
+
+
+<span class="c1"># GUI setup</span>
+<span class="n">root</span> <span class="o">=</span> <span class="n">tk</span><span class="o">.</span><span class="n">Tk</span><span class="p">()</span>
+<span class="n">root</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="n">get_translation</span><span class="p">(</span><span class="s2">&quot;title&quot;</span><span class="p">))</span>
+<span class="n">frame</span> <span class="o">=</span> <span class="n">ttk</span><span class="o">.</span><span class="n">Frame</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="n">padding</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+<span class="n">frame</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="n">fill</span><span class="o">=</span><span class="n">tk</span><span class="o">.</span><span class="n">BOTH</span><span class="p">,</span> <span class="n">expand</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="n">chat_display</span> <span class="o">=</span> <span class="n">tk</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">state</span><span class="o">=</span><span class="s2">&quot;disabled&quot;</span><span class="p">,</span> <span class="n">wrap</span><span class="o">=</span><span class="n">tk</span><span class="o">.</span><span class="n">WORD</span><span class="p">)</span>
+<span class="n">chat_display</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="n">fill</span><span class="o">=</span><span class="n">tk</span><span class="o">.</span><span class="n">BOTH</span><span class="p">,</span> <span class="n">expand</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="n">input_box</span> <span class="o">=</span> <span class="n">tk</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+<span class="n">input_box</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="n">fill</span><span class="o">=</span><span class="n">tk</span><span class="o">.</span><span class="n">BOTH</span><span class="p">,</span> <span class="n">expand</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="n">send_button</span> <span class="o">=</span> <span class="n">ttk</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="n">get_translation</span><span class="p">(</span><span class="s2">&quot;send&quot;</span><span class="p">),</span> <span class="n">command</span><span class="o">=</span><span class="n">send_message</span><span class="p">)</span>
+<span class="n">send_button</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="n">pady</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+
+<span class="n">save_frame</span> <span class="o">=</span> <span class="n">ttk</span><span class="o">.</span><span class="n">Frame</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
+<span class="n">save_frame</span><span class="o">.</span><span class="n">pack</span><span class="p">()</span>
+
+<span class="n">save_txt_button</span> <span class="o">=</span> <span class="n">ttk</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="n">save_frame</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="n">get_translation</span><span class="p">(</span><span class="s2">&quot;save_txt&quot;</span><span class="p">),</span> <span class="n">command</span><span class="o">=</span><span class="n">save_as_txt</span><span class="p">)</span>
+<span class="n">save_txt_button</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="n">side</span><span class="o">=</span><span class="n">tk</span><span class="o">.</span><span class="n">LEFT</span><span class="p">,</span> <span class="n">padx</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+
+<span class="n">save_docx_button</span> <span class="o">=</span> <span class="n">ttk</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="n">save_frame</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="n">get_translation</span><span class="p">(</span><span class="s2">&quot;save_docx&quot;</span><span class="p">),</span> <span class="n">command</span><span class="o">=</span><span class="n">save_as_docx</span><span class="p">)</span>
+<span class="n">save_docx_button</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="n">side</span><span class="o">=</span><span class="n">tk</span><span class="o">.</span><span class="n">LEFT</span><span class="p">,</span> <span class="n">padx</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+
+<span class="n">plot_button</span> <span class="o">=</span> <span class="n">ttk</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="s2">&quot;Wykres długości&quot;</span><span class="p">,</span> <span class="n">command</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">plot_lengths</span><span class="p">(</span><span class="n">chat_manager</span><span class="o">.</span><span class="n">get</span><span class="p">()))</span>
+<span class="n">plot_button</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="n">pady</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+
+<span class="n">mode_label</span> <span class="o">=</span> <span class="n">ttk</span><span class="o">.</span><span class="n">Label</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="n">get_translation</span><span class="p">(</span><span class="s2">&quot;mode&quot;</span><span class="p">))</span>
+<span class="n">mode_label</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="n">pady</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+
+<span class="n">mode_var</span> <span class="o">=</span> <span class="n">tk</span><span class="o">.</span><span class="n">StringVar</span><span class="p">()</span>
+<span class="n">mode_menu</span> <span class="o">=</span> <span class="n">ttk</span><span class="o">.</span><span class="n">Combobox</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="n">textvariable</span><span class="o">=</span><span class="n">mode_var</span><span class="p">,</span> <span class="n">state</span><span class="o">=</span><span class="s2">&quot;readonly&quot;</span><span class="p">)</span>
+<span class="n">mode_menu</span><span class="o">.</span><span class="n">pack</span><span class="p">()</span>
+
+<span class="n">model_label</span> <span class="o">=</span> <span class="n">ttk</span><span class="o">.</span><span class="n">Label</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="n">get_translation</span><span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">))</span>
+<span class="n">model_label</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="n">pady</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+
+<span class="n">model_var</span> <span class="o">=</span> <span class="n">tk</span><span class="o">.</span><span class="n">StringVar</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="n">DEFAULT_MODEL</span><span class="p">)</span>
+<span class="n">model_menu</span> <span class="o">=</span> <span class="n">ttk</span><span class="o">.</span><span class="n">Combobox</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="n">textvariable</span><span class="o">=</span><span class="n">model_var</span><span class="p">,</span> <span class="n">values</span><span class="o">=</span><span class="n">AVAILABLE_MODELS</span><span class="p">,</span> <span class="n">state</span><span class="o">=</span><span class="s2">&quot;readonly&quot;</span><span class="p">)</span>
+<span class="n">model_menu</span><span class="o">.</span><span class="n">pack</span><span class="p">()</span>
+
+<span class="n">lang_button</span> <span class="o">=</span> <span class="n">ttk</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="n">get_translation</span><span class="p">(</span><span class="s2">&quot;language&quot;</span><span class="p">),</span> <span class="n">command</span><span class="o">=</span><span class="n">switch_language</span><span class="p">)</span>
+<span class="n">lang_button</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="n">pady</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="apply_uppercase">
+<a class="viewcode-back" href="../index.html#main.apply_uppercase">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">apply_uppercase</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert all messages in chat to uppercase.&quot;&quot;&quot;</span>
+    <span class="n">chat_manager</span><span class="o">.</span><span class="n">convo</span> <span class="o">=</span> <span class="n">uppercase_conversation</span><span class="p">(</span><span class="n">chat_manager</span><span class="o">.</span><span class="n">get</span><span class="p">())</span>
+    <span class="n">display_chat</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="filter_user_msgs">
+<a class="viewcode-back" href="../index.html#main.filter_user_msgs">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">filter_user_msgs</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Filter the conversation to include only user messages.&quot;&quot;&quot;</span>
+    <span class="n">chat_manager</span><span class="o">.</span><span class="n">convo</span> <span class="o">=</span> <span class="n">only_user_messages</span><span class="p">(</span><span class="n">chat_manager</span><span class="o">.</span><span class="n">get</span><span class="p">())</span>
+    <span class="n">display_chat</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="show_char_count">
+<a class="viewcode-back" href="../index.html#main.show_char_count">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">show_char_count</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Display total number of characters in the conversation.&quot;&quot;&quot;</span>
+    <span class="n">count</span> <span class="o">=</span> <span class="n">total_chars</span><span class="p">(</span><span class="n">chat_manager</span><span class="o">.</span><span class="n">get</span><span class="p">())</span>
+    <span class="n">chat_manager</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s2">&quot;Bot&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;Łączna liczba znaków: </span><span class="si">{</span><span class="n">count</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">display_chat</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="show_unique_speakers">
+<a class="viewcode-back" href="../index.html#main.show_unique_speakers">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">show_unique_speakers</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Display a list of unique speakers.&quot;&quot;&quot;</span>
+    <span class="n">unique</span> <span class="o">=</span> <span class="n">get_unique_speakers</span><span class="p">(</span><span class="n">chat_manager</span><span class="o">.</span><span class="n">get</span><span class="p">())</span>
+    <span class="n">chat_manager</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s2">&quot;Bot&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;Unikalni rozmówcy: </span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">unique</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">display_chat</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="save_using_class">
+<a class="viewcode-back" href="../index.html#main.save_using_class">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">save_using_class</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Save conversation using an OOP-style TxtSaver class.&quot;&quot;&quot;</span>
+    <span class="n">saver</span> <span class="o">=</span> <span class="n">TxtSaver</span><span class="p">(</span><span class="n">chat_manager</span><span class="o">.</span><span class="n">get</span><span class="p">())</span>
+    <span class="n">saver</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+    <span class="n">chat_manager</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s2">&quot;Bot&quot;</span><span class="p">,</span> <span class="s2">&quot;Zapisano czat przez klasę dziedziczącą.&quot;</span><span class="p">)</span>
+    <span class="n">display_chat</span><span class="p">()</span></div>
+
+
+
+<span class="n">search_entry</span> <span class="o">=</span> <span class="n">ttk</span><span class="o">.</span><span class="n">Entry</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
+<span class="n">search_entry</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="n">pady</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="perform_search">
+<a class="viewcode-back" href="../index.html#main.perform_search">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">perform_search</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Search for a keyword in messages and show matching results.&quot;&quot;&quot;</span>
+    <span class="n">keyword</span> <span class="o">=</span> <span class="n">search_entry</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">keyword</span><span class="p">:</span>
+        <span class="n">results</span> <span class="o">=</span> <span class="n">search_messages</span><span class="p">(</span><span class="n">chat_manager</span><span class="o">.</span><span class="n">get</span><span class="p">(),</span> <span class="n">keyword</span><span class="p">)</span>
+        <span class="n">chat_manager</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">who</span><span class="p">,</span> <span class="n">msg</span> <span class="ow">in</span> <span class="n">results</span><span class="p">:</span>
+            <span class="n">chat_manager</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">who</span><span class="p">,</span> <span class="n">msg</span><span class="p">)</span>
+        <span class="n">display_chat</span><span class="p">()</span></div>
+
+
+
+<span class="n">button_frame</span> <span class="o">=</span> <span class="n">ttk</span><span class="o">.</span><span class="n">Frame</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>  <span class="c1"># nowy pod-frame w istniejącym frame</span>
+<span class="n">button_frame</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="n">pady</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>       <span class="c1"># tutaj możesz użyć pack</span>
+
+<span class="n">buttons</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">ttk</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="n">button_frame</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="s2">&quot;Szukaj słowa&quot;</span><span class="p">,</span> <span class="n">command</span><span class="o">=</span><span class="n">perform_search</span><span class="p">),</span>
+    <span class="n">ttk</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="n">button_frame</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="s2">&quot;Zapisz (dziedziczenie)&quot;</span><span class="p">,</span> <span class="n">command</span><span class="o">=</span><span class="n">save_using_class</span><span class="p">),</span>
+    <span class="n">ttk</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="n">button_frame</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="s2">&quot;Unikalni rozmówcy&quot;</span><span class="p">,</span> <span class="n">command</span><span class="o">=</span><span class="n">show_unique_speakers</span><span class="p">),</span>
+    <span class="n">ttk</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="n">button_frame</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="s2">&quot;WIELKIE LITERY&quot;</span><span class="p">,</span> <span class="n">command</span><span class="o">=</span><span class="n">apply_uppercase</span><span class="p">),</span>
+    <span class="n">ttk</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="n">button_frame</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="s2">&quot;Tylko użytkownik&quot;</span><span class="p">,</span> <span class="n">command</span><span class="o">=</span><span class="n">filter_user_msgs</span><span class="p">),</span>
+    <span class="n">ttk</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="n">button_frame</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="s2">&quot;Policz znaki&quot;</span><span class="p">,</span> <span class="n">command</span><span class="o">=</span><span class="n">show_char_count</span><span class="p">),</span>
+<span class="p">]</span>
+
+<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">btn</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">buttons</span><span class="p">):</span>
+    <span class="n">row</span> <span class="o">=</span> <span class="n">i</span> <span class="o">//</span> <span class="mi">3</span>
+    <span class="n">col</span> <span class="o">=</span> <span class="n">i</span> <span class="o">%</span> <span class="mi">3</span>
+    <span class="n">btn</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="n">row</span><span class="o">=</span><span class="n">row</span><span class="p">,</span> <span class="n">column</span><span class="o">=</span><span class="n">col</span><span class="p">,</span> <span class="n">padx</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">pady</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">sticky</span><span class="o">=</span><span class="s2">&quot;ew&quot;</span><span class="p">)</span>
+
+
+<span class="n">update_labels</span><span class="p">()</span>
+<span class="n">root</span><span class="o">.</span><span class="n">mainloop</span><span class="p">()</span>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">ChatBot</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2025, Mateusz Lewandowski , Marek Sikora.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.1.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>
